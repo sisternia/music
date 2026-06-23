@@ -1,20 +1,97 @@
-# Run Project
+# Hướng Dẫn Chạy Dự Án
 
-## Requirements
+## Yêu Cầu
 
-- Python 3.10+
+- Python 3.10 trở lên
+- PostgreSQL
 
-## Install Dependencies
+---
 
-### Using Virtual Environment
+# 1. Thiết Lập Môi Trường (Setup)
 
-Create virtual environment:
+### Bước 1: Tạo Project Django
+
+Tạo cấu trúc project Django trong thư mục hiện tại.
+
+```bash
+django-admin startproject config .
+```
+
+---
+
+### Bước 2: Tạo Django App
+
+Tạo một app mới trong thư mục `apps`.
+
+```bash
+python manage.py startapp <app_name> apps/<app_name>
+```
+
+---
+
+### Bước 3: Tạo Migration
+
+Sinh file migration từ các model đã khai báo.
+
+```bash
+python manage.py makemigrations
+```
+
+---
+
+### Bước 4: Đồng Bộ Database
+
+Tạo hoặc cập nhật các bảng trong cơ sở dữ liệu.
+
+```bash
+python manage.py migrate
+```
+
+---
+
+# 2. Thiết Lập Cơ Sở Dữ Liệu
+
+### Bước 1: Đăng Nhập PostgreSQL
+
+```bash
+psql -U postgres
+```
+
+---
+
+### Bước 2: Kiểm Tra Danh Sách Database
+
+```sql
+\l
+```
+
+---
+
+### Bước 3: Tạo Database
+
+```sql
+CREATE DATABASE music;
+```
+
+---
+
+### Bước 4: Thoát PostgreSQL
+
+```sql
+\q
+```
+
+---
+
+# 3. Chạy Dự Án Bằng Virtual Environment (Khuyến Nghị)
+
+### Bước 1: Tạo Virtual Environment
 
 ```bash
 python -m venv .venv
 ```
 
-Activate virtual environment:
+### Bước 2: Kích Hoạt Virtual Environment
 
 **Windows**
 
@@ -28,43 +105,43 @@ Activate virtual environment:
 source .venv/bin/activate
 ```
 
-Install dependencies:
+### Bước 3: Cài Đặt Thư Viện
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run project:
+### Bước 4: Cấu Hình Biến Môi Trường
+
+Tạo file `.env` từ file `.env.example` và cập nhật các giá trị cần thiết.
+
+### Bước 5: Khởi Động Dự Án
 
 ```bash
-python main.py
+python manage.py runserver
 ```
 
-Access API:
+### Bước 6: Truy Cập Hệ Thống
+
+**Trang Chủ**
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Access Swagger UI:
+**Swagger UI**
 
 ```text
-http://127.0.0.1:8000/swagger
+http://127.0.0.1:8000/swagger/
 ```
 
-Access OpenAPI Schema:
+**ReDoc**
 
 ```text
-http://127.0.0.1:8000/openapi.json
+http://127.0.0.1:8000/redoc/
 ```
 
-Access ReDoc:
-
-```text
-http://127.0.0.1:8000/redoc
-```
-
-Deactivate virtual environment:
+### Bước 7: Tắt Virtual Environment
 
 ```bash
 deactivate
@@ -72,46 +149,40 @@ deactivate
 
 ---
 
-### Without Virtual Environment
+# 4. Chạy Dự Án Không Dùng Virtual Environment
 
-Install dependencies:
+### Bước 1: Cài Đặt Thư Viện
 
 ```bash
 pip install -r requirements.txt
 ```
 
-Run project:
+### Bước 2: Cấu Hình Biến Môi Trường
+
+Tạo file `.env` từ file `.env.example` và cập nhật các giá trị cần thiết.
+
+### Bước 3: Khởi Động Dự Án
 
 ```bash
-python main.py
+python manage.py runserver
 ```
 
-Access API:
+### Bước 4: Truy Cập Hệ Thống
+
+**Trang Chủ**
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Access Swagger UI:
+**Swagger UI**
 
 ```text
-http://127.0.0.1:8000/swagger
+http://127.0.0.1:8000/swagger/
 ```
 
-Access OpenAPI Schema:
+**ReDoc**
 
 ```text
-http://127.0.0.1:8000/openapi.json
+http://127.0.0.1:8000/redoc/
 ```
-
-Access ReDoc:
-
-```text
-http://127.0.0.1:8000/redoc
-```
-
----
-
-## Environment Variables
-
-Create `.env` from `.env.example` and update the required values before running the project.
