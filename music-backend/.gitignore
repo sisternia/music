@@ -1,0 +1,68 @@
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# Environment Variables
+.env
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Build / Distribution
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Type Checkers
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Temporary Files
+*.tmp
+*.temp
+
+# SQLite
+*.sqlite3
+db.sqlite3
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Local Environment Files
+.env.local
+.env.development
+.env.production
+
+# Python Packaging
+pip-wheel-metadata/
+
+# Testing
+.cache/
+
+# Uploaded Files
+uploads/
+media/
+
+# FastAPI
+*.pid
