@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from rest_framework import permissions
 
 from drf_yasg import openapi
@@ -28,5 +28,10 @@ urlpatterns = [
         "redoc/",
         schema_view.with_ui("redoc", cache_timeout=0),
         name="schema-redoc",
+    ),
+
+    path(
+        "api/accounts/",
+        include("apps.accounts.urls"),
     ),
 ]
