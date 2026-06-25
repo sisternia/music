@@ -24,3 +24,49 @@ class Account(models.Model):
 
     class Meta:
         db_table = "account"
+
+
+class VerifyAccount(models.Model):
+
+    class VerifyStatus(models.TextChoices):
+        UNVERIFIED = "UNVERIFIED", "UNVERIFIED"
+        VERIFIED = "VERIFIED", "VERIFIED"
+        LOCKED = "LOCKED", "LOCKED"
+
+    verify_id = models.BigAutoField(
+        primary_key=True
+    )
+
+    user = models.ForeignKey(
+        Account,
+        on_delete=models.CASCADE,
+        db_column="user_id",
+        related_name="verify_accounts",
+    )
+
+    verify_code = models.CharField(
+        max_length=6
+    )
+
+    verify_status = models.CharField(
+        max_length=20,
+        choices=VerifyStatus.choices,
+        default=VerifyStatus.UNVERIFIED,
+    )
+
+    create_time = models.DateTimeField(
+        auto_now_add=True
+    )
+
+    verify_time = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    lock_time = models.DateTimeField(
+        null=True,
+        blank=True,
+    )
+
+    class Meta:
+        db_table = "verify_account"

@@ -1,7 +1,10 @@
 from django.urls import path
 
-from .views import RegisterView
-from .views import LoginView
+from .views import (
+    LoginView,
+    RegisterView,
+    SendVerifyCodeView,
+)
 
 urlpatterns = [
     path(
@@ -14,5 +17,11 @@ urlpatterns = [
         "login/",
         LoginView.as_view(),
         name="login",
+    ),
+
+    path(
+        "send-verify-code/",
+        SendVerifyCodeView.as_view(),
+        name="send_verify_code",
     ),
 ]
