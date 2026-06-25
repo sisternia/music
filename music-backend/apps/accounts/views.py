@@ -11,8 +11,10 @@ from .serializers import (
     LoginSerializer,
     RegisterSerializer,
     SendVerifyCodeSerializer,
+    VerifyCodeSerializer,
 )
 from .services import MailService
+from .services import VerifyCodeService
 
 
 class LoginView(APIView):
@@ -237,3 +239,168 @@ class SendVerifyCodeView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class CheckVerifyCodeView(APIView):
+
+    authentication_classes = []
+    permission_classes = []
+
+    @swagger_auto_schema(
+        tags=["Auth"],
+        operation_summary="Check Verify Code Expiry",
+        operation_description="Check whether a 6-digit verification code is still valid or expired.",
+        request_body=VerifyCodeSerializer,
+        responses={
+            200: "Check Success",
+            400: "Validation Error",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            500: "Internal Server Error",
+            503: "Service Unavailable",
+        },
+    )
+    def post(self, request):
+
+        serializer = VerifyCodeSerializer(
+            data=request.data
+        )
+
+        if not serializer.is_valid():
+
+            return Response(
+                {
+                    "message": "Validation Error",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+
+            result = VerifyCodeService.check_code(
+                email=serializer.validated_data["email"],
+                verify_code=serializer.validated_data["verify_code"],
+            )
+
+        except Exception as e:
+
+            return Response(
+                {
+                    "message": "Service Unavailable",
+                    "error": str(e),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not result["exists"]:
+
+            return Response(
+                {
+                    "message": result["message"],
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "message": result["message"],
+                "data": {
+                    "is_valid": result["is_valid"],
+                    "is_expired": result["is_expired"],
+                    "verify_status": result["verify_status"],
+                    "created_at": result["created_at"],
+                    "expire_at": result["expire_at"],
+                    "expire_minutes": VerifyCodeService.get_expire_minutes(),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class ConfirmVerifyCodeView(APIView):
+
+    authentication_classes = []
+    permission_classes = []
+
+    @swagger_auto_schema(
+        tags=["Auth"],
+        operation_summary="Confirm Verify Code",
+        operation_description="Confirm the 6-digit verification code and mark the account as VERIFIED when it is correct and not expired.",
+        request_body=VerifyCodeSerializer,
+        responses={
+            200: "Confirm Success",
+            400: "Validation Error",
+            401: "Unauthorized",
+            403: "Forbidden",
+            404: "Not Found",
+            500: "Internal Server Error",
+            503: "Service Unavailable",
+        },
+    )
+    def post(self, request):
+
+        serializer = VerifyCodeSerializer(
+            data=request.data
+        )
+
+        if not serializer.is_valid():
+
+            return Response(
+                {
+                    "message": "Validation Error",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+
+            result = VerifyCodeService.confirm_code(
+                email=serializer.validated_data["email"],
+                verify_code=serializer.validated_data["verify_code"],
+            )
+
+        except Exception as e:
+
+            return Response(
+                {
+                    "message": "Service Unavailable",
+                    "error": str(e),
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        if not result["exists"]:
+
+            return Response(
+                {
+                    "message": result["message"],
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if not result.get("confirmed", False):
+
+            return Response(
+                {
+                    "message": result["message"],
+                    "data": {
+                        "is_expired": result.get("is_expired", False),
+                        "verify_status": result.get("verify_status"),
+                    },
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "message": result["message"],
+                "data": {
+                    "verify_status": result["verify_status"],
+                    "verify_time": result.get("verify_time"),
+                },
+            },
+            status=status.HTTP_200_OK,
+        )

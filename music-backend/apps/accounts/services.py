@@ -3,10 +3,14 @@ import smtplib
 import socket
 from contextlib import suppress
 from email.utils import parseaddr
+from datetime import timedelta
 
 import dns.resolver
 from decouple import config
 from django.core.mail import send_mail
+from django.utils import timezone
+
+from django.conf import settings
 
 from .models import Account
 from .models import VerifyAccount
@@ -125,10 +129,30 @@ class MailService:
 
         verify_code = MailService.generate_verify_code()
 
-        verify = VerifyAccount.objects.create(
-            user=account,
-            verify_code=verify_code,
+        verify = (
+            VerifyAccount.objects.filter(
+                user=account,
+            )
+            .order_by("-create_time")
+            .first()
         )
+
+        if verify:
+            VerifyAccount.objects.filter(
+                verify_id=verify.verify_id,
+            ).update(
+                verify_code=verify_code,
+                verify_status=VerifyAccount.VerifyStatus.UNVERIFIED,
+                verify_time=None,
+                lock_time=None,
+                create_time=timezone.now(),
+            )
+            verify.refresh_from_db()
+        else:
+            verify = VerifyAccount.objects.create(
+                user=account,
+                verify_code=verify_code,
+            )
 
         send_mail(
             subject="Music Account Verification",
@@ -144,3 +168,145 @@ class MailService:
         )
 
         return verify
+
+
+class VerifyCodeService:
+
+    @staticmethod
+    def get_expire_minutes() -> int:
+
+        return getattr(
+            settings,
+            "VERIFY_CODE_EXPIRE_MINUTES",
+            10,
+        )
+
+    @staticmethod
+    def get_expire_at(verify: VerifyAccount):
+
+        return verify.create_time + timedelta(
+            minutes=VerifyCodeService.get_expire_minutes()
+        )
+
+    @staticmethod
+    def is_expired(verify: VerifyAccount) -> bool:
+
+        return timezone.now() >= VerifyCodeService.get_expire_at(
+            verify
+        )
+
+    @staticmethod
+    def check_code(email: str, verify_code: str):
+
+        try:
+
+            account = Account.objects.get(email=email)
+            verify = (
+                VerifyAccount.objects.filter(
+                    user=account,
+                    verify_code=verify_code,
+                )
+                .order_by("-create_time")
+                .first()
+            )
+
+            if not verify:
+                return {
+                    "exists": False,
+                    "is_valid": False,
+                    "is_expired": False,
+                    "message": "Verification code not found.",
+                }
+
+            is_expired = VerifyCodeService.is_expired(verify)
+
+            return {
+                "exists": True,
+                "is_valid": verify.verify_status == VerifyAccount.VerifyStatus.UNVERIFIED
+                and not is_expired,
+                "is_expired": is_expired,
+                "expire_at": VerifyCodeService.get_expire_at(verify),
+                "created_at": verify.create_time,
+                "verify_status": verify.verify_status,
+                "message": (
+                    "Verification code is valid."
+                    if verify.verify_status == VerifyAccount.VerifyStatus.UNVERIFIED
+                    and not is_expired
+                    else "Verification code has expired."
+                ),
+            }
+
+        except Account.DoesNotExist:
+
+            return {
+                "exists": False,
+                "is_valid": False,
+                "is_expired": False,
+                "message": "Account not found.",
+            }
+
+    @staticmethod
+    def confirm_code(email: str, verify_code: str):
+
+        try:
+
+            account = Account.objects.get(email=email)
+            verify = (
+                VerifyAccount.objects.filter(
+                    user=account,
+                    verify_code=verify_code,
+                )
+                .order_by("-create_time")
+                .first()
+            )
+
+            if not verify:
+                return {
+                    "exists": False,
+                    "confirmed": False,
+                    "message": "Verification code not found.",
+                }
+
+            if verify.verify_status == VerifyAccount.VerifyStatus.VERIFIED:
+                return {
+                    "exists": True,
+                    "confirmed": True,
+                    "is_expired": False,
+                    "verify_status": verify.verify_status,
+                    "message": "Account already verified.",
+                }
+
+            if VerifyCodeService.is_expired(verify):
+                return {
+                    "exists": True,
+                    "confirmed": False,
+                    "is_expired": True,
+                    "verify_status": verify.verify_status,
+                    "message": "Verification code has expired.",
+                }
+
+            verify.verify_status = VerifyAccount.VerifyStatus.VERIFIED
+            verify.verify_time = timezone.now()
+            verify.save(
+                update_fields=[
+                    "verify_status",
+                    "verify_time",
+                ]
+            )
+
+            return {
+                "exists": True,
+                "confirmed": True,
+                "is_expired": False,
+                "verify_status": verify.verify_status,
+                "verify_time": verify.verify_time,
+                "message": "Account verified successfully.",
+            }
+
+        except Account.DoesNotExist:
+
+            return {
+                "exists": False,
+                "confirmed": False,
+                "message": "Account not found.",
+            }
