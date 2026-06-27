@@ -14,6 +14,14 @@ class Account(models.Model):
         max_length=255
     )
 
+    role = models.ForeignKey(
+        "roles_permissions.RoleAccount",
+        on_delete=models.PROTECT,
+        db_column="role_id",
+        related_name="accounts",
+        default=2,
+    )
+
     create_time = models.DateTimeField(
         auto_now_add=True
     )

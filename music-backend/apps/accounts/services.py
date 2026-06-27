@@ -11,6 +11,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from django.conf import settings
+from django.contrib.auth.hashers import make_password
 
 from .models import Account
 from .models import VerifyAccount
@@ -142,9 +143,6 @@ class MailService:
                 verify_id=verify.verify_id,
             ).update(
                 verify_code=verify_code,
-                verify_status=VerifyAccount.VerifyStatus.UNVERIFIED,
-                verify_time=None,
-                lock_time=None,
                 create_time=timezone.now(),
             )
             verify.refresh_from_db()
@@ -308,5 +306,110 @@ class VerifyCodeService:
             return {
                 "exists": False,
                 "confirmed": False,
+                "message": "Account not found.",
+            }
+
+    @staticmethod
+    def validate_code(email: str, verify_code: str):
+
+        try:
+
+            account = Account.objects.get(email=email)
+            verify = (
+                VerifyAccount.objects.filter(
+                    user=account,
+                    verify_code=verify_code,
+                )
+                .order_by("-create_time")
+                .first()
+            )
+
+            if not verify:
+                return {
+                    "exists": False,
+                    "is_valid": False,
+                    "is_expired": False,
+                    "message": "Verification code not found.",
+                }
+
+            is_expired = VerifyCodeService.is_expired(verify)
+            is_valid = not is_expired
+
+            return {
+                "exists": True,
+                "is_valid": is_valid,
+                "is_expired": is_expired,
+                "verify_status": verify.verify_status,
+                "created_at": verify.create_time,
+                "expire_at": VerifyCodeService.get_expire_at(verify),
+                "message": (
+                    "Verification code is valid."
+                    if is_valid
+                    else "Verification code has expired."
+                ),
+            }
+
+        except Account.DoesNotExist:
+
+            return {
+                "exists": False,
+                "is_valid": False,
+                "is_expired": False,
+                "message": "Account not found.",
+            }
+
+    @staticmethod
+    def reset_password(
+        email: str,
+        verify_code: str,
+        new_password: str,
+    ):
+
+        try:
+
+            account = Account.objects.get(email=email)
+            verify = (
+                VerifyAccount.objects.filter(
+                    user=account,
+                    verify_code=verify_code,
+                )
+                .order_by("-create_time")
+                .first()
+            )
+
+            if not verify:
+                return {
+                    "exists": False,
+                    "reset": False,
+                    "message": "Verification code not found.",
+                }
+
+            if VerifyCodeService.is_expired(verify):
+                return {
+                    "exists": True,
+                    "reset": False,
+                    "is_expired": True,
+                    "verify_status": verify.verify_status,
+                    "message": "Verification code has expired.",
+                }
+
+            account.password = make_password(new_password)
+            account.save(update_fields=["password", "update_time"])
+
+            return {
+                "exists": True,
+                "reset": True,
+                "is_expired": False,
+                "verify_status": verify.verify_status,
+                "user_id": account.user_id,
+                "email": account.email,
+                "message": "Password reset successfully.",
+            }
+
+        except Account.DoesNotExist:
+
+            return {
+                "exists": False,
+                "reset": False,
                 "message": "Account not found.",
             }

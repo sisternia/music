@@ -1,11 +1,14 @@
 from django.urls import path
 
 from .views import (
+    AdminUserListView,
     CheckVerifyCodeView,
     ConfirmVerifyCodeView,
     LoginView,
     RegisterView,
+    ResetPasswordView,
     SendVerifyCodeView,
+    ValidateVerifyCodeView,
 )
 
 urlpatterns = [
@@ -37,5 +40,23 @@ urlpatterns = [
         "auth/confirm-verify-code/",
         ConfirmVerifyCodeView.as_view(),
         name="confirm_verify_code",
+    ),
+
+    path(
+        "auth/validate-verify-code/",
+        ValidateVerifyCodeView.as_view(),
+        name="validate_verify_code",
+    ),
+
+    path(
+        "auth/reset-password/",
+        ResetPasswordView.as_view(),
+        name="reset_password",
+    ),
+
+    path(
+        "admin/users/",
+        AdminUserListView.as_view(),
+        name="admin_users",
     ),
 ]
