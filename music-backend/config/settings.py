@@ -12,10 +12,29 @@ SECRET_KEY = config(
     default="dev-only-secret-key"
 )
 
+def _read_debug(value):
+
+    if isinstance(value, bool):
+        return value
+
+    if value is None:
+        return False
+
+    value = str(value).strip().lower()
+
+    if value in {"1", "true", "yes", "on", "debug"}:
+        return True
+
+    if value in {"0", "false", "no", "off", "release", "prod", "production"}:
+        return False
+
+    return False
+
+
 DEBUG = config(
     "DEBUG",
-    default=True,
-    cast=bool
+    default="True",
+    cast=_read_debug
 )
 
 ALLOWED_HOSTS = config(
@@ -47,6 +66,7 @@ INSTALLED_APPS = [
 
     # Local Apps
     "apps.accounts",
+    "apps.roles_permissions.apps.RolesPermissionsConfig",
 ]
 
 
