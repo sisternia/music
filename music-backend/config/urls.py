@@ -52,4 +52,9 @@ urlpatterns = [
         "api/accounts/",
         include("apps.accounts.urls"),
     ),
+
+    path(
+        "api/roles-permissions/",
+        include("apps.roles_permissions.urls"),
+    ),
 ]

@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     AdminUserListView,
+    AdminUpdateUserRoleView,
     CheckVerifyCodeView,
     ConfirmVerifyCodeView,
     LoginView,
@@ -58,5 +59,11 @@ urlpatterns = [
         "admin/users/",
         AdminUserListView.as_view(),
         name="admin_users",
+    ),
+
+    path(
+        "admin/users/update-role/",
+        AdminUpdateUserRoleView.as_view(),
+        name="admin_update_user_role",
     ),
 ]
