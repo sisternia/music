@@ -1,6 +1,6 @@
-imodule.exports = {
+module.exports = {
   entry: {
-		main: './js/main.js',
+		main: require.resolve('./main.js'),
   },
   output: {
 		filename: '[name]-bundle.js',

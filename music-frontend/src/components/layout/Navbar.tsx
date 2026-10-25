@@ -8,14 +8,14 @@ type NavItem = {
   key: string;
   label: string;
   icon: IconName;
-  href?: "/";
+  href?: "/" | "/piano";
 };
 
 const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Trang chủ", icon: "home", href: "/" },
   { key: "community", label: "Cộng đồng yêu nhạc", icon: "community" },
   { key: "news", label: "Bản tin", icon: "news" },
-  { key: "piano", label: "Piano", icon: "piano", href: "/piano" as any },
+  { key: "piano", label: "Piano", icon: "piano", href: "/piano" },
   { key: "ai", label: "AI", icon: "ai" },
   { key: "settings", label: "Cài đặt", icon: "settings" },
 ];
@@ -29,7 +29,7 @@ export default function Navbar() {
     <View style={styles.shell}>
       <View style={styles.mainItems}>
         {NAV_ITEMS.map((item) => {
-          const active = item.href === "/" ? pathname === "/" : false;
+          const active = item.href !== undefined && pathname === item.href;
           const hovered = hoveredKey === item.key;
 
           return (
