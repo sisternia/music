@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { Context, Sampler } from 'tone';
 
 export const usePianoAudio = () => {
-  const samplerRef = useRef<any>(null);
-  const ToneRef = useRef<any>(null);
+  const samplerRef = useRef<Sampler | null>(null);
+  const ToneRef = useRef<typeof import('tone') | null>(null);
+  const activeNotesRef = useRef(new Map<string, symbol>());
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    const activeNotes = activeNotesRef.current;
+    let context: Context | undefined;
     (async () => {
       try {
         // Load Tone.js dynamically only on the client (browser) to avoid Server-Side Rendering (SSR) issues
@@ -14,10 +18,11 @@ export const usePianoAudio = () => {
         if (!mounted) return;
         ToneRef.current = Tone;
 
-        Tone.setContext(new Tone.Context({
+        context = new Tone.Context({
           latencyHint: 'interactive',
-          lookAhead: 0.025,
-        }));
+          lookAhead: 0,
+        });
+        Tone.setContext(context);
 
         const sampler = new Tone.Sampler({
           urls: {
@@ -45,42 +50,49 @@ export const usePianoAudio = () => {
 
     return () => {
       mounted = false;
+      activeNotes.clear();
       if (samplerRef.current) {
         samplerRef.current.dispose();
+        samplerRef.current = null;
       }
+      void context?.close();
     };
   }, []);
 
-  const pressNote = async (note: string, velocity: number = 0.5) => {
-    if (!ToneRef.current) return;
+  const pressNote = useCallback(async (note: string, velocity: number = 0.5) => {
+    if (!ToneRef.current || !samplerRef.current?.loaded) return;
     const Tone = ToneRef.current;
+    const pressId = Symbol(note);
+    activeNotesRef.current.set(note, pressId);
     if (Tone.context.state !== 'running') {
       await Tone.start();
     }
-    if (samplerRef.current && isReady) {
-      samplerRef.current.triggerAttack(note, "+0", velocity);
+    if (samplerRef.current?.loaded && activeNotesRef.current.get(note) === pressId) {
+      samplerRef.current.triggerAttack(note, Tone.getContext().immediate(), velocity);
     }
-  };
+  }, []);
 
-  const releaseNote = (note: string) => {
-    if (samplerRef.current && isReady) {
-      samplerRef.current.triggerRelease(note, "+0.1");
+  const releaseNote = useCallback((note: string) => {
+    activeNotesRef.current.delete(note);
+    if (samplerRef.current?.loaded && ToneRef.current) {
+      samplerRef.current.triggerRelease(note, ToneRef.current.getContext().immediate());
     }
-  };
+  }, []);
 
-  const allOff = () => {
-    if (samplerRef.current && isReady) {
+  const allOff = useCallback(() => {
+    activeNotesRef.current.clear();
+    if (samplerRef.current?.loaded) {
       samplerRef.current.releaseAll();
     }
-  };
+  }, []);
 
-  const setGlobalVolume = (vol: number) => {
+  const setGlobalVolume = useCallback((vol: number) => {
     if (ToneRef.current && ToneRef.current.getDestination) {
       // Convert linear volume (0-1) to Decibels
       const db = vol <= 0 ? -Infinity : 20 * Math.log10(vol);
       ToneRef.current.getDestination().volume.value = db;
     }
-  };
+  }, []);
 
   return {
     isReady,

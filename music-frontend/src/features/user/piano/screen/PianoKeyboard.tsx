@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Icon } from '@iconify/react';
 import { usePianoAudio } from '../hooks/usePianoAudio';
 import './piano.css';
@@ -44,6 +44,33 @@ const KEYBOARD_MAP: Record<string, string> = {
   'KeyP': 'D#5', 'Semicolon': 'E5', 'Quote': 'F5',
 };
 
+const PianoKey = React.memo(function PianoKey({ note, hue, pressed, velocity, onPlay, onStop }: {
+  note: string;
+  hue: number;
+  pressed: boolean;
+  velocity: number;
+  onPlay: (note: string) => void;
+  onStop: (note: string) => void;
+}) {
+  return (
+    <button
+      data-note={note}
+      className={pressed ? 'pressed' : ''}
+      style={{ '--key-hue': hue, '--velocity': velocity } as React.CSSProperties}
+      onMouseDown={event => {
+        event.preventDefault();
+        if (event.button === 0) onPlay(note);
+      }}
+      onMouseEnter={event => { if (event.buttons === 1) onPlay(note); }}
+      onMouseLeave={event => { if (event.buttons === 1) onStop(note); }}
+      onMouseUp={event => { if (event.button === 0) onStop(note); }}
+      tabIndex={-1}
+    >
+      <span>{noteToLabel(note)}</span>
+    </button>
+  );
+});
+
 export const PianoKeyboard = () => {
   const { isReady, pressNote, releaseNote, setGlobalVolume } = usePianoAudio();
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
@@ -53,7 +80,7 @@ export const PianoKeyboard = () => {
   const [muted, setMuted] = useState(false);
   const [showVelocity, setShowVelocity] = useState(false);
   const [noteVelocities, setNoteVelocities] = useState<Record<string, number>>({});
-  const [isCinema, setIsCinema] = useState(false);
+  const [showEffects, setShowEffects] = useState(false);
   const [staffState, setStaffState] = useState(1); // 0: hidden, 1: treble, 2: both
   const [labelStateIndex, setLabelStateIndex] = useState(1); // 0: '', 1: 'letters', 2: 'letters numbers'
 
@@ -75,124 +102,73 @@ export const PianoKeyboard = () => {
     }
   }, [volume, muted, setGlobalVolume]);
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.repeat) return;
-    const note = KEYBOARD_MAP[e.code];
-    if (note && !pressedKeysRef.current.has(note)) {
-      pressedKeysRef.current.add(note);
-      setPressedKeys(new Set(pressedKeysRef.current));
-      pressNote(note, volume / 100);
-      setNoteVelocities(prev => ({ ...prev, [note]: volume / 100 }));
+  const keysByTouchesRef = useRef<Record<number, string>>({});
 
+  const playNote = useCallback((note: string) => {
+    if (pressedKeysRef.current.has(note)) return;
+    // Start audio before scheduling visual updates.
+    void pressNote(note, volume / 100);
+    pressedKeysRef.current.add(note);
+    setPressedKeys(new Set(pressedKeysRef.current));
+    setNoteVelocities(prev => ({ ...prev, [note]: volume / 100 }));
+
+    if (showEffects) {
       const id = ++rollIdRef.current;
       setRollHistory(prev => ({
         ...prev,
-        [note]: [...(prev[note] || []), { id, state: 'pressed' }]
+        [note]: [...(prev[note] || []), { id, state: 'pressed' }],
       }));
     }
-  };
+  }, [pressNote, volume, showEffects]);
 
-  const handleKeyUp = (e: KeyboardEvent) => {
-    const note = KEYBOARD_MAP[e.code];
-    if (note && pressedKeysRef.current.has(note)) {
-      pressedKeysRef.current.delete(note);
-      setPressedKeys(new Set(pressedKeysRef.current));
-      releaseNote(note);
+  const stopNote = useCallback((note: string) => {
+    if (!pressedKeysRef.current.has(note)) return;
+    releaseNote(note);
+    pressedKeysRef.current.delete(note);
+    setPressedKeys(new Set(pressedKeysRef.current));
 
+    if (showEffects) {
       setRollHistory(prev => {
-        const notes = prev[note] || [];
-        const last = notes[notes.length - 1];
-        if (last && last.state === 'pressed') {
-          const updated = [...notes];
-          updated[updated.length - 1] = { ...last, state: 'released' };
-
-          // Cleanup after 5s (duration of rise-up animation)
-          setTimeout(() => {
-            setRollHistory(curr => ({
-              ...curr,
-              [note]: curr[note]?.filter(n => n.id !== last.id) || []
-            }));
-          }, 5000);
-
-          return { ...prev, [note]: updated };
-        }
-        return prev;
+        const notes = prev[note];
+        if (!notes?.length || notes[notes.length - 1].state !== 'pressed') return prev;
+        return {
+          ...prev,
+          [note]: notes.map((roll, index) => index === notes.length - 1
+            ? { ...roll, state: 'released' }
+            : roll),
+        };
       });
     }
-  };
+  }, [releaseNote, showEffects]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-
-
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.isContentEditable || target.closest('input, textarea, select, button'))) return;
+      const note = KEYBOARD_MAP[event.code];
+      if (note) {
+        event.preventDefault();
+        playNote(note);
+      }
+    };
+    const handleKeyUp = (event: KeyboardEvent) => {
+      const note = KEYBOARD_MAP[event.code];
+      if (note) stopNote(note);
+    };
+    const releasePressedNotes = () => {
+      for (const note of pressedKeysRef.current) stopNote(note);
+      keysByTouchesRef.current = {};
+    };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', releasePressedNotes);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', releasePressedNotes);
     };
-  }, [pressNote, releaseNote, volume]);
-
-  const keysByTouchesRef = useRef<Record<number, string>>({});
-
-  const playNote = (note: string) => {
-    if (!pressedKeysRef.current.has(note)) {
-      pressedKeysRef.current.add(note);
-      setPressedKeys(new Set(pressedKeysRef.current));
-      pressNote(note, volume / 100);
-      setNoteVelocities(prev => ({ ...prev, [note]: volume / 100 }));
-
-      const id = ++rollIdRef.current;
-      setRollHistory(prev => ({
-        ...prev,
-        [note]: [...(prev[note] || []), { id, state: 'pressed' }]
-      }));
-    }
-  };
-
-  const stopNote = (note: string) => {
-    if (pressedKeysRef.current.has(note)) {
-      pressedKeysRef.current.delete(note);
-      setPressedKeys(new Set(pressedKeysRef.current));
-      releaseNote(note);
-
-      setRollHistory(prev => {
-        const notes = prev[note] || [];
-        const last = notes[notes.length - 1];
-        if (last && last.state === 'pressed') {
-          const updated = [...notes];
-          updated[updated.length - 1] = { ...last, state: 'released' };
-
-          setTimeout(() => {
-            setRollHistory(curr => ({
-              ...curr,
-              [note]: curr[note]?.filter(n => n.id !== last.id) || []
-            }));
-          }, 5000);
-
-          return { ...prev, [note]: updated };
-        }
-        return prev;
-      });
-    }
-  };
-
-  // Mouse Handlers
-  const handleMouseDown = (e: React.MouseEvent, note: string) => {
-    e.preventDefault();
-    if (e.button === 0) playNote(note);
-  };
-  const handleMouseEnter = (e: React.MouseEvent, note: string) => {
-    if (e.buttons === 1) playNote(note);
-  };
-  const handleMouseLeave = (e: React.MouseEvent, note: string) => {
-    if (e.buttons === 1) stopNote(note);
-  };
-  const handleMouseUp = (e: React.MouseEvent, note: string) => {
-    if (e.button === 0) stopNote(note);
-  };
-
+  }, [playNote, stopNote]);
   // Touch Handlers
   const getNoteFromTouch = (touch: React.Touch) => {
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -250,29 +226,12 @@ export const PianoKeyboard = () => {
 
   // Mảng nốt nhạc cho khuông nhạc (Staff notes)
   return (
-    <div className={`piano-page ${isCinema ? 'cinema' : ''}`}>
-      <div className="cinema-bar" style={{ zIndex: 1000 }}>
-        <button id="fullscreen" title="toggle fullscreen" data-placement="bottom" onClick={() => {
-          if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(() => { });
-          } else {
-            if (document.exitFullscreen) {
-              document.exitFullscreen();
-            }
-          }
-        }}>
-          <Icon icon="mdi-fullscreen" />
-        </button>
-        <button id="cinema-off" title="close cinema mode" data-placement="bottom" onClick={() => setIsCinema(false)}>
-          <Icon icon="mdi-close" />
-        </button>
+    <div className={`piano-page ${showEffects ? 'effects-enabled' : ''}`}>
+      <div className="background" aria-hidden="true">
+        {Array.from({ length: 8 }, (_, index) => (
+          <div key={index} className="smoke" />
+        ))}
       </div>
-
-      <div className="back-background"></div>
-      <div className="background">
-        {[...Array(8)].map((_, i) => <div key={i} className="smoke"></div>)}
-      </div>
-
 
       <div className="content">
         <div className="chat-sidebar"></div>
@@ -296,50 +255,51 @@ export const PianoKeyboard = () => {
             onTouchEnd={handleTouchEnd}
             onTouchCancel={handleTouchEnd}
           >
-            <div className="pianoroll">
+            {showEffects && <div className="pianoroll">
               {keysData.map(k => (
                 <div key={k.note} data-note={k.note} style={{ '--key-hue': k.hue } as any}>
                   {(rollHistory[k.note] || []).map(roll => (
                     <React.Fragment key={roll.id}>
                       <div className={`back ${roll.state}`}></div>
-                      <div className={`front ${roll.state}`}></div>
+                      <div
+                        className={`front ${roll.state}`}
+                        onAnimationEnd={event => {
+                          if (event.animationName !== 'rise-up') return;
+                          setRollHistory(prev => ({
+                            ...prev,
+                            [k.note]: (prev[k.note] || []).filter(item => item.id !== roll.id),
+                          }));
+                        }}
+                      ></div>
                     </React.Fragment>
                   ))}
                 </div>
               ))}
-            </div>
+            </div>}
             <div className="top-keys">
               {keysData.map(k => (
-                <button
+                <PianoKey
                   key={k.note}
-                  data-note={k.note}
-                  className={pressedKeys.has(k.note) ? 'pressed' : ''}
-                  style={{ '--key-hue': k.hue, '--velocity': noteVelocities[k.note] ?? 0 } as React.CSSProperties}
-                  onMouseDown={(e) => handleMouseDown(e, k.note)}
-                  onMouseEnter={(e) => handleMouseEnter(e, k.note)}
-                  onMouseLeave={(e) => handleMouseLeave(e, k.note)}
-                  onMouseUp={(e) => handleMouseUp(e, k.note)}
-                  tabIndex={-1}
-                >
-                  <span>{noteToLabel(k.note)}</span>
-                </button>
+                  note={k.note}
+                  hue={k.hue}
+                  pressed={pressedKeys.has(k.note)}
+                  velocity={noteVelocities[k.note] ?? 0}
+                  onPlay={playNote}
+                  onStop={stopNote}
+                />
               ))}
             </div>
             <div className="bottom-keys">
               {keysData.filter(k => !k.isBlack).map(k => (
-                <button
+                <PianoKey
                   key={k.note}
-                  data-note={k.note}
-                  className={pressedKeys.has(k.note) ? 'pressed' : ''}
-                  style={{ '--key-hue': k.hue, '--velocity': noteVelocities[k.note] ?? 0 } as React.CSSProperties}
-                  onMouseDown={(e) => handleMouseDown(e, k.note)}
-                  onMouseEnter={(e) => handleMouseEnter(e, k.note)}
-                  onMouseLeave={(e) => handleMouseLeave(e, k.note)}
-                  onMouseUp={(e) => handleMouseUp(e, k.note)}
-                  tabIndex={-1}
-                >
-                  <span>{noteToLabel(k.note)}</span>
-                </button>
+                  note={k.note}
+                  hue={k.hue}
+                  pressed={pressedKeys.has(k.note)}
+                  velocity={noteVelocities[k.note] ?? 0}
+                  onPlay={playNote}
+                  onStop={stopNote}
+                />
               ))}
             </div>
           </div>
@@ -401,7 +361,17 @@ export const PianoKeyboard = () => {
                 </button>
               </div>
               <div>
-                <button id="toggle-cinema" title="cinema mode" aria-label="enter cinema mode" onClick={() => setIsCinema(true)}>
+                <button
+                  id="toggle-cinema"
+                  title="Cinema effects"
+                  aria-label="toggle cinema effects"
+                  aria-pressed={showEffects}
+                  onClick={() => {
+                    setRollHistory({});
+                    setShowEffects(current => !current);
+                  }}
+                  className={getButtonStateClass(showEffects)}
+                >
                   <Icon icon="mdi-television-clean" />
                 </button>
               </div>
