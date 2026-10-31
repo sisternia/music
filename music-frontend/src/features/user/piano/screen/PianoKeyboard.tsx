@@ -1,8 +1,17 @@
+'use dom';
+
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { Icon } from '@iconify/react';
+import { useWindowDimensions } from 'react-native';
+import Icon from './PianoControlIcon';
 import { usePianoAudio } from '../hooks/usePianoAudio';
 import './piano.css';
 import PianoStaff from './PianoStaff';
+import PianoImport from './PianoImport';
+import PianoSongPlayer from './PianoSongPlayer';
+import { configurePianoApi, type PianoSong } from '../hooks/transcription';
+import './transcription.css';
+import './mobile.css';
+import { pianoPublicAsset } from '../hooks/public-assets';
 
 const allNotes: string[] = [];
 allNotes.push("A0", "A#0", "B0");
@@ -57,13 +66,16 @@ const PianoKey = React.memo(function PianoKey({ note, hue, pressed, velocity, on
       data-note={note}
       className={pressed ? 'pressed' : ''}
       style={{ '--key-hue': hue, '--velocity': velocity } as React.CSSProperties}
-      onMouseDown={event => {
+      onPointerDown={event => {
+        if (event.pointerType === 'touch') return;
         event.preventDefault();
         if (event.button === 0) onPlay(note);
       }}
-      onMouseEnter={event => { if (event.buttons === 1) onPlay(note); }}
-      onMouseLeave={event => { if (event.buttons === 1) onStop(note); }}
-      onMouseUp={event => { if (event.button === 0) onStop(note); }}
+      onPointerEnter={event => { if (event.pointerType !== 'touch' && event.buttons === 1) onPlay(note); }}
+      onPointerLeave={event => { if (event.pointerType !== 'touch' && event.buttons === 1) onStop(note); }}
+      onPointerUp={event => { if (event.pointerType !== 'touch' && event.button === 0) onStop(note); }}
+      onPointerCancel={event => { if (event.pointerType !== 'touch') onStop(note); }}
+      aria-label={`Nốt ${note}`}
       tabIndex={-1}
     >
       <span>{noteToLabel(note)}</span>
@@ -71,8 +83,28 @@ const PianoKey = React.memo(function PianoKey({ note, hue, pressed, velocity, on
   );
 });
 
-export const PianoKeyboard = () => {
-  const { isReady, pressNote, releaseNote, setGlobalVolume } = usePianoAudio();
+export default function PianoKeyboard({ apiUrl, nativeHost = false, initialSong = null, startInEdition = false, workspace = false, onNewTranscription, onProjectUpdate, onEditionChange }: {
+  apiUrl?: string;
+  nativeHost?: boolean;
+  initialSong?: PianoSong | null;
+  startInEdition?: boolean;
+  workspace?: boolean;
+  onNewTranscription?: () => void;
+  onProjectUpdate?: (song: PianoSong, previousId?: string) => void;
+  onEditionChange?: (edition: boolean) => void;
+  dom?: import('expo/dom').DOMProps;
+}) {
+  const { width, height } = useWindowDimensions();
+  const compact = width < 900;
+  const [rangeStart, setRangeStart] = useState(39); // C4
+  const [showAllKeys, setShowAllKeys] = useState(false);
+  const rangeCount = width > height ? 25 : 13;
+  useEffect(() => { configurePianoApi(apiUrl); }, [apiUrl]);
+  const pianoAudio = usePianoAudio();
+  const { isReady, pressNote, releaseNote, setGlobalVolume } = pianoAudio;
+  const [importOpen, setImportOpen] = useState(false);
+  const [song, setSong] = useState<PianoSong | null>(initialSong);
+  const [playbackKeys, setPlaybackKeys] = useState<Set<string>>(new Set());
   const [pressedKeys, setPressedKeys] = useState<Set<string>>(new Set());
   const pressedKeysRef = useRef<Set<string>>(new Set());
 
@@ -160,13 +192,18 @@ export const PianoKeyboard = () => {
       for (const note of pressedKeysRef.current) stopNote(note);
       keysByTouchesRef.current = {};
     };
+    const handleVisibilityChange = () => { if (document.hidden) releasePressedNotes(); };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     window.addEventListener('blur', releasePressedNotes);
+    window.addEventListener('pagehide', releasePressedNotes);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', releasePressedNotes);
+      window.removeEventListener('pagehide', releasePressedNotes);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [playNote, stopNote]);
   // Touch Handlers
@@ -179,13 +216,19 @@ export const PianoKeyboard = () => {
 
   const handleTouchStart = (e: React.TouchEvent) => {
     // e.preventDefault(); // Might cause issues with passive listener, use css touch-action instead
-    Array.from(e.targetTouches).forEach(touch => {
+    Array.from(e.changedTouches).forEach(touch => {
       const note = getNoteFromTouch(touch);
       if (note) {
         playNote(note);
         keysByTouchesRef.current[touch.identifier] = note;
       }
     });
+  };
+
+  const releaseTouch = (id: number) => {
+    const note = keysByTouchesRef.current[id];
+    delete keysByTouchesRef.current[id];
+    if (note && !Object.values(keysByTouchesRef.current).includes(note)) stopNote(note);
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
@@ -195,12 +238,11 @@ export const PianoKeyboard = () => {
       const currentNote = keysByTouchesRef.current[id];
 
       if (note && note !== currentNote) {
-        if (currentNote) stopNote(currentNote);
+        if (currentNote) releaseTouch(id);
         playNote(note);
         keysByTouchesRef.current[id] = note;
       } else if (!note && currentNote) {
-        stopNote(currentNote);
-        delete keysByTouchesRef.current[id];
+        releaseTouch(id);
       }
     });
   };
@@ -208,27 +250,42 @@ export const PianoKeyboard = () => {
   const handleTouchEnd = (e: React.TouchEvent) => {
     Array.from(e.changedTouches).forEach(touch => {
       const id = touch.identifier;
-      const note = keysByTouchesRef.current[id];
-      if (note) {
-        stopNote(note);
-        delete keysByTouchesRef.current[id];
-      }
+      releaseTouch(id);
     });
   };
 
   const keysData = useMemo(() => {
-    return allNotes.map((note, i) => {
+    const keys = allNotes.map((note, i) => {
       const hue = 360 * ((i - 3) / 12);
       const isBlack = note.includes('#');
       return { note, hue, isBlack };
     });
-  }, []);
+    if (!compact || showAllKeys || song) return keys;
+    const start = Math.min(rangeStart, allNotes.length - rangeCount);
+    return keys.slice(start, start + rangeCount);
+  }, [compact, showAllKeys, song, rangeStart, rangeCount]);
 
   // Mảng nốt nhạc cho khuông nhạc (Staff notes)
   return (
-    <div className={`piano-page ${showEffects ? 'effects-enabled' : ''}`}>
+    <div
+      className={`piano-page ${workspace ? 'studio-piano' : ''} ${showEffects ? 'effects-enabled' : ''} ${song ? 'has-song' : ''} ${nativeHost ? 'native-host' : ''} ${compact && !showAllKeys && !song ? 'zoomed-keys' : ''}`}
+      style={{
+        '--piano-smoke': `url("${pianoPublicAsset('img/smoke_blur.webp')}")`,
+        '--piano-smoke-layer': `url("${pianoPublicAsset('img/smoke_layer1_blur.webp')}")`,
+      } as React.CSSProperties}
+    >
+      {nativeHost && <style>{`@font-face { font-family: Bravura; src: url(${JSON.stringify(pianoPublicAsset('font/Bravura.woff2'))}); }`}</style>}
+      <PianoImport
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={value => {
+          pianoAudio.allOff();
+          setPlaybackKeys(new Set());
+          setSong({ ...value, notes: [...value.notes].sort((a, b) => a.start - b.start) });
+        }}
+      />
       <div className="background" aria-hidden="true">
-        {Array.from({ length: 8 }, (_, index) => (
+        {Array.from({ length: compact ? 2 : workspace ? 3 : 8 }, (_, index) => (
           <div key={index} className="smoke" />
         ))}
       </div>
@@ -237,16 +294,31 @@ export const PianoKeyboard = () => {
         <div className="chat-sidebar"></div>
         <div className="main-content">
           <div className="info-row">
-            <div className="staff-paper" hidden={staffState === 0}>
+            {song ? <PianoSongPlayer
+              song={song}
+              audio={pianoAudio}
+              startInEdition={startInEdition}
+              onEditionChange={onEditionChange}
+              onNewTranscription={onNewTranscription || (() => setImportOpen(true))}
+              onSongChange={updated => { onProjectUpdate?.(updated, song.id); setSong(updated); }}
+              onActiveNotes={setPlaybackKeys}
+              onClose={() => { setSong(null); setPlaybackKeys(new Set()); }}
+            /> : <div className="staff-paper" hidden={staffState === 0}>
               <PianoStaff pressedKeys={pressedKeys} showBass={staffState === 2} />
               <div className="chord-info">
                 <b id="chord-name">
                   {!isReady ? 'Loading audio...' : ''}
                 </b>
               </div>
-            </div>
+            </div>}
           </div>
 
+          {compact && !song && <div className="piano-range-controls" aria-label="Quãng bàn phím">
+            <button disabled={showAllKeys || rangeStart === 0} onClick={() => setRangeStart(value => Math.max(0, value - 12))} aria-label="Quãng thấp hơn">‹</button>
+            <span>{keysData[0].note} – {keysData[keysData.length - 1].note}</span>
+            <button disabled={showAllKeys || rangeStart >= allNotes.length - rangeCount} onClick={() => setRangeStart(value => Math.min(allNotes.length - rangeCount, value + 12))} aria-label="Quãng cao hơn">›</button>
+            <button aria-pressed={showAllKeys} onClick={() => setShowAllKeys(value => !value)}>{showAllKeys ? 'Phóng phím' : '88 phím'}</button>
+          </div>}
           <div
             className={`keyboard ${['', 'letters', 'letters numbers'][labelStateIndex]} ${showVelocity ? 'velocity' : ''}`}
             style={{ touchAction: 'none' }}
@@ -282,7 +354,7 @@ export const PianoKeyboard = () => {
                   key={k.note}
                   note={k.note}
                   hue={k.hue}
-                  pressed={pressedKeys.has(k.note)}
+                  pressed={pressedKeys.has(k.note) || playbackKeys.has(k.note)}
                   velocity={noteVelocities[k.note] ?? 0}
                   onPlay={playNote}
                   onStop={stopNote}
@@ -295,7 +367,7 @@ export const PianoKeyboard = () => {
                   key={k.note}
                   note={k.note}
                   hue={k.hue}
-                  pressed={pressedKeys.has(k.note)}
+                  pressed={pressedKeys.has(k.note) || playbackKeys.has(k.note)}
                   velocity={noteVelocities[k.note] ?? 0}
                   onPlay={playNote}
                   onStop={stopNote}
@@ -307,11 +379,11 @@ export const PianoKeyboard = () => {
           <div className="bar tool-bar">
             <div id="instrument-app" className="tool-bar">
               <div>
-                <label id="instrument-label" htmlFor="instrument">
+                <button id="instrument-label" title="Chọn file hoặc link YouTube" aria-label="Nhập bản nhạc để chuyển thành piano" onClick={() => setImportOpen(true)}>
                   <span>
                     <Icon icon="mdi-piano" />
                   </span>
-                </label>
+                </button>
                 <label className="volume-label" title="volume" tabIndex={0}>
                   <span className="volume-icon" id="mute-span" onClick={() => setMuted(!muted)}>
                     {muted ? (
@@ -392,4 +464,4 @@ export const PianoKeyboard = () => {
       </div>
     </div>
   );
-};
+}

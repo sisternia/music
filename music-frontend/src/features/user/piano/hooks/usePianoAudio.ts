@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Context, Sampler } from 'tone';
+import { pianoPublicAsset } from './public-assets';
 
 export const usePianoAudio = () => {
   const samplerRef = useRef<Sampler | null>(null);
@@ -35,7 +36,7 @@ export const usePianoAudio = () => {
             "A6" : "A6.mp3", "C7" : "C7.mp3", "D#7" : "Ds7.mp3", "F#7" : "Fs7.mp3",
             "A7" : "A7.mp3", "C8" : "C8.mp3"
           },
-          baseUrl: "/audio/salamander/",
+          baseUrl: pianoPublicAsset('audio/salamander/'),
           release: 1,
           onload: () => {
             if (mounted) setIsReady(true);
@@ -94,11 +95,29 @@ export const usePianoAudio = () => {
     }
   }, []);
 
+  const preparePlayback = useCallback(async () => {
+    if (!samplerRef.current?.loaded || !ToneRef.current) {
+      throw new Error('Âm thanh piano đang tải. Vui lòng đợi một chút.');
+    }
+    await ToneRef.current.start();
+  }, []);
+
+  const audioTime = useCallback(() => ToneRef.current?.getContext().immediate() ?? 0, []);
+
+  const scheduleNote = useCallback((note: string, duration: number, time: number, velocity: number) => {
+    if (samplerRef.current?.loaded) {
+      samplerRef.current.triggerAttackRelease(note, Math.max(0.01, duration), time, velocity);
+    }
+  }, []);
+
   return {
     isReady,
     pressNote,
     releaseNote,
     allOff,
-    setGlobalVolume
+    setGlobalVolume,
+    preparePlayback,
+    audioTime,
+    scheduleNote,
   };
 };

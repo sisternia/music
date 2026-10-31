@@ -1,19 +1,19 @@
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-export default function Header() {
+export default function Header({ compact = false }: { compact?: boolean }) {
   return (
-    <View style={styles.header}>
-      <View style={styles.left}>
+    <View style={[styles.header, compact && styles.compactHeader]}>
+      <View style={[styles.left, compact && styles.compactLeft]}>
         <Image
           source={require('@/assets/images/Harmony Auralis Logo.png')}
-          style={styles.logo}
+          style={[styles.logo, compact && styles.compactLogo]}
           resizeMode="contain"
           accessibilityLabel="Harmony Auralis Logo"
         />
       </View>
 
-      <View style={styles.center}>
-        <View style={styles.searchWrap}>
+      <View style={[styles.center, compact && styles.compactCenter]}>
+        <View style={[styles.searchWrap, compact && styles.compactSearch]}>
           <Text style={styles.searchIcon}>⌕</Text>
           <TextInput
             style={styles.searchInput}
@@ -24,12 +24,12 @@ export default function Header() {
         </View>
       </View>
 
-      <View style={styles.right}>
-        <Pressable style={({ pressed }) => [styles.loginButton, pressed && styles.pressed]}>
-          <Text style={styles.loginText}>Đăng nhập</Text>
+      <View style={[styles.right, compact && styles.compactRight]}>
+        <Pressable style={({ pressed }) => [styles.loginButton, compact && styles.compactButton, pressed && styles.pressed]}>
+          <Text style={[styles.loginText, compact && styles.compactButtonText]}>Đăng nhập</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.signupButton, pressed && styles.pressed]}>
-          <Text style={styles.signupText}>Đăng ký</Text>
+        <Pressable style={({ pressed }) => [styles.signupButton, compact && styles.compactButton, pressed && styles.pressed]}>
+          <Text style={[styles.signupText, compact && styles.compactButtonText]}>Đăng ký</Text>
         </Pressable>
       </View>
     </View>
@@ -37,6 +37,14 @@ export default function Header() {
 }
 
 const styles = StyleSheet.create({
+  compactHeader: { minHeight: 56, paddingHorizontal: 10, gap: 8 },
+  compactLeft: { flex: 0, minWidth: 78, width: 78 },
+  compactLogo: { width: 78, height: 30 },
+  compactCenter: { flex: 1, minWidth: 0 },
+  compactSearch: { height: 36, paddingHorizontal: 7, gap: 4 },
+  compactRight: { flex: 0, minWidth: 128, width: 128, gap: 4 },
+  compactButton: { width: 62, height: 36, borderRadius: 9 },
+  compactButtonText: { fontSize: 10 },
   header: {
     width: '100%',
     minHeight: 92,

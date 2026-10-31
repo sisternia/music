@@ -20,14 +20,14 @@ const NAV_ITEMS: NavItem[] = [
   { key: "settings", label: "Cài đặt", icon: "settings" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
 
   return (
-    <View style={styles.shell}>
-      <View style={styles.mainItems}>
+    <View style={[styles.shell, compact && styles.compactShell]}>
+      <View style={[styles.mainItems, compact && styles.compactItems]}>
         {NAV_ITEMS.map((item) => {
           const active = item.href !== undefined && pathname === item.href;
           const hovered = hoveredKey === item.key;
@@ -48,6 +48,7 @@ export default function Navbar() {
               }
               style={({ pressed }) => [
                 styles.item,
+                compact && styles.compactItem,
                 active && styles.itemActive,
                 hovered && !active && styles.itemHover,
                 pressed && styles.itemPressed,
@@ -76,7 +77,7 @@ export default function Navbar() {
         accessibilityLabel="Hướng dẫn"
         onHoverIn={() => setHoveredKey("help")}
         onHoverOut={() => setHoveredKey((current) => (current === "help" ? null : current))}
-        style={({ pressed }) => [styles.help, pressed && styles.itemPressed]}
+        style={({ pressed }) => [styles.help, compact && styles.compactItem, pressed && styles.itemPressed]}
       >
         <Text style={styles.helpIcon}>?</Text>
         {hoveredKey === "help" ? (
@@ -92,6 +93,9 @@ export default function Navbar() {
 }
 
 const styles = StyleSheet.create({
+  compactShell: { width: 44, paddingVertical: 8 },
+  compactItems: { gap: 6 },
+  compactItem: { width: 32, height: 32, borderRadius: 10 },
   shell: {
     width: 72,
     borderRightWidth: 1,

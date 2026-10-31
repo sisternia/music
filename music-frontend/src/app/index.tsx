@@ -1,1 +1,5 @@
-export { default } from '@/features/user/home/screen/HomeWeb';
+import { Redirect } from 'expo-router';
+
+export default function Index() {
+  return <Redirect href="/new-transcription" />;
+}

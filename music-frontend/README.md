@@ -4,6 +4,10 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 
 ## Get started
 
+### Piano: nhập file / YouTube và phát phổ nhạc
+
+Trang chủ `/` mở thẳng Studio với New transcription, Projects và Collections. Nhập file hoặc dán link YouTube ngay dưới khung tải file để chuyển sang Piano. Edition và Create a score đang tạm ẩn. Home dùng anime.js để chuyển động các nốt nhạc và tự dừng khi bật giảm chuyển động. Giao diện trang chủ nằm trong `src/features/user/home`; `/piano` vẫn dùng chung giao diện này. Cần khởi động dịch vụ AI ở cổng `8001` bên cạnh Expo. Xem [hướng dẫn Piano AI](../docs/Piano-AI.md) để chạy backend và cấu hình GPU/CPU.
+
 1. Install dependencies
 
    ```bash

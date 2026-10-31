@@ -1,0 +1,112 @@
+html:has(.native-host), body:has(.native-host) { margin: 0; height: 100%; overflow: hidden; }
+.piano-page.native-host { width: 100vw; height: 100dvh; }
+.piano-range-controls { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; flex-shrink: 0; padding: 6px 8px; color: #f3f5f5; background: #17211fc9; font-size: 12px; }
+.piano-range-controls button { min-width: 36px; min-height: 36px; padding: 5px 10px; border: 1px solid #687974; border-radius: 8px; background: #30403b; color: white; font: inherit; cursor: pointer; touch-action: manipulation; }
+.piano-range-controls button:disabled { opacity: .4; }
+.piano-range-controls button[aria-pressed=true] { background: #1e8470; }
+.piano-page .keyboard { -webkit-touch-callout: none; -webkit-user-select: none; }
+@media (max-width: 899px) {
+  .piano-page .main-content { min-height: 0; }
+  .piano-page .info-row { min-height: 0; overflow: auto; }
+  .piano-page .staff-paper { margin: 12px 8px; padding: 12px; max-width: calc(100% - 16px); }
+  .piano-page.zoomed-keys .keyboard { height: clamp(120px, 24dvh, 210px); padding-bottom: 0; }
+  .piano-page:not(.zoomed-keys) .keyboard { height: 0; padding-bottom: max(80px, 10%); }
+  .piano-page:not(.zoomed-keys) .keyboard button > span { display: none; }
+  .piano-page .bar.tool-bar { flex-shrink: 0; min-height: 52px; padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); gap: 5px; flex-wrap: wrap; }
+  .piano-page .bar.tool-bar > div { flex: 0 0 auto; }
+  .piano-page .bar.tool-bar > div:nth-child(2) { flex: 1; justify-content: center; }
+  .piano-page .bar.tool-bar :is(button, label) { min-width: 32px; min-height: 38px; padding: 6px; touch-action: manipulation; }
+  .piano-page .bar.tool-bar label.volume-label { min-width: 32px; }
+  .piano-page .bar.tool-bar .iconify { width: 19px; height: 22px; font-size: 19px; }
+  .piano-page .bar.tool-bar .volume-label:hover > input.volume { width: 1px; opacity: 0; }
+  .piano-page .bar.tool-bar .volume-label:focus-within > input.volume { width: 50px; opacity: 1; }
+  .piano-page .bar button::after { top: -4px; }
+  .piano-page .keyboard button { touch-action: none; }
+  .piano-page .piano-import-backdrop { padding: 12px; align-items: center; }
+  .piano-page .piano-import { max-height: calc(100dvh - 24px); padding: 26px 18px; -webkit-overflow-scrolling: touch; }
+  .piano-page .piano-import h2 { font-size: 23px; }
+  .piano-page .piano-upload-zone { padding: 18px 12px; }
+  .piano-page .piano-youtube-label input { min-width: 0; width: 100%; font-size: 16px; }
+  .piano-page.has-song .keyboard { height: 0; padding-bottom: max(72px, 8%); }
+  .piano-page .piano-song-heading { flex-shrink: 0; padding: 8px 10px 4px; }
+  .piano-page .piano-song-heading h2 { font-size: 14px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .piano-page .piano-score-navigation { flex-shrink: 0; gap: 5px; padding: 4px 8px; }
+  .piano-page .piano-score-scroll { padding: 4px; -webkit-overflow-scrolling: touch; }
+  .piano-page .piano-score-svg { min-width: 640px; }
+  .piano-page .piano-song-transport { flex-shrink: 0; flex-wrap: wrap; gap: 6px; padding: 5px 8px; font-size: 10px; }
+  .piano-page .piano-song-transport button { min-height: 32px; min-width: 32px; }
+  .piano-page .piano-song-transport input[type=range] { min-width: 55px; }
+  .piano-page .piano-falling-notes { height: clamp(58px, 13dvh, 120px); }
+}
+@media (max-width: 370px) {
+  .piano-page .bar.tool-bar > #recorder-app { display: none; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .piano-page.zoomed-keys .keyboard { height: 95px; }
+  .piano-page .piano-range-controls { padding: 2px 8px; }
+  .piano-page .piano-range-controls button { min-height: 28px; }
+  .piano-page .bar.tool-bar { min-height: 42px; padding-top: 3px; padding-bottom: 3px; }
+  .piano-page.has-song .keyboard { padding-bottom: 52px; }
+  .piano-page .piano-song-heading { padding-top: 3px; }
+  .piano-page .piano-song-heading span, .piano-page .piano-song-heading small { display: none; }
+  .piano-page .piano-score-navigation a { display: none; }
+  .piano-page .piano-falling-notes { height: 40px; }
+}
+
+/* Keep each control centered, with state markers inside its own cell. */
+.piano-page .bar.tool-bar :is(button, label.volume-label) {
+  width: 56px;
+  min-width: 56px;
+  height: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  overflow: visible;
+}
+.piano-page .bar.tool-bar button[hidden] { display: none; }
+.piano-page .bar.tool-bar .iconify {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  overflow: visible;
+}
+.piano-page .bar.tool-bar .volume-icon { width: auto; align-items: center; }
+.piano-page .bar.tool-bar .volume-label > input.volume {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 7px);
+  width: 92px;
+  height: 30px;
+  padding: 4px 8px;
+  margin: 0;
+  border-radius: 8px;
+  background: #ededed;
+  box-shadow: 0 2px 8px #0002;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.piano-page .bar.tool-bar .volume-label:is(:hover,:focus-within) > input.volume { width: 92px; opacity: 1; pointer-events: auto; }
+.piano-page .bar.tool-bar button:is(.on,.onon,.ononon)::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  right: auto;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+  transform: translateX(-50%);
+}
+.piano-page .bar.tool-bar button.onon::after { box-shadow: 6px 0 currentColor; transform: translateX(-6px); }
+.piano-page .bar.tool-bar button.ononon::after { box-shadow: -6px 0 currentColor,6px 0 currentColor; }
+@media (max-width: 900px) {
+  .piano-page .bar.tool-bar :is(button, label.volume-label) { width: 36px; min-width: 36px; height: 40px; min-height: 40px; }
+  .piano-page .bar.tool-bar .iconify { width: 21px; height: 21px; }
+}
